@@ -1,4 +1,15 @@
 (function (Vue) { //表示依赖了全局的vue
+  var STORAGE_KEY = 'items-vuejs';
+  // 本地存储数据对象
+  const itemStorage = {
+    fetch: function () { // 获取本地数据
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    },
+    save: function (items) { // 保存数据到本地
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+  }
+
   //自定义全局指令，用于 增加输入框
   //定义时不要在前面加v-, 引用指令时要加上v
   Vue.directive('app-focus', {
@@ -8,26 +19,24 @@
     }
   })
   //表示申明的变量是不可变的
-  const items = [
-    {
-      id: 1, //主键
-      content: 'vue.js', //输入的内容
-      completed: false //是否完成
-    },{
-      id: 2, //主键
-      content: 'java', //输入的内容
-      completed: false //是否完成
-    },{
-      id: 3, //主键
-      content: 'puthon', //输入的内容
-      completed: true //是否完成
-    }
-  ]
-  new Vue({
+  const items = []
+  var app = new Vue({
     el: '#todoapp',
     data: {
-      items,
-      currentItem: null //上面不要少了逗号， 接收当前点击的任务项
+      items: itemStorage.fetch(), //获取本地数据进行初始化,
+      currentItem: null, //上面不要少了逗号， 接收当前点击的任务项
+      filterStatus: 'all' //接收变化的状态值
+    },
+    // 监听器
+    watch: {
+      // 如果 items 发生改变，这个函数就会运行
+      items: {
+        deep: true, // 发现对象内部值的变化, 要在选项参数中指定 deep: true。
+        handler: function(newItems, oldItems) {
+          //本地进行存储
+          itemStorage.save(newItems)
+        }
+      }
     },
     //自定义局部指令，用于编辑输入框
     directives: {
@@ -122,8 +131,36 @@
             item.completed = newStatus
           })
         }
-      }
+      },
+      // 过滤出不同状态数据
+      filterItems () {
+        //this.filterStatus 作为条件，变化后过滤不同数据
+        switch (this.filterStatus) {
+          case "active": // 过滤出未完成的数据
+            return this.items.filter( item => !item.completed)
+            break
+          case "completed": // 过滤出已完成的数据
+            return this.items.filter( item => item.completed)
+            break
+          default: // 其他，返回所有数据
+            return this.items
+        }
+      },
     },
   })
+
+  //当路由 hash 值改变后会自动调用此函数
+  window.onhashchange = function() {
+    console.log('hash改变了', window.location.hash)
+    // 1.获取点击的路由 hash , 当截取的 hash 不为空返回截取的，为空时返回 'all'
+    const hash = window.location.hash.substr(2) || 'all'
+    console.log('hash', hash)
+    // 2. 状态一旦改变，将 hash 赋值给 filterStatus
+    // 当计算属性 filterItems 感知到 filterStatus 变化后，就会重新过滤
+    // 当 filterItems 重新过滤出目标数据后，则自动同步更新到视图中
+    app.filterStatus = hash
+  }
+  // 第一次访问页面时,调用一次让状态生效
+  window.onhashchange()
 
 })(Vue);
